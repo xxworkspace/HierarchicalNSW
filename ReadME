@@ -6,13 +6,13 @@ The dimension of data with int8 should be aligned with 64.
 
 build:
   g++ version >= 5.5
+  ubuntu version >= 16.04
   pip install pybind11
-  pip install setup
   bash mk.sh
 
 usage:
   import hnswxx
-
+  see more in test
 api:
   class hnswxx
   methods:
@@ -23,3 +23,6 @@ api:
     saveIndex(path)
     loadIndex(path)
 
+note:
+    m/query_ef/construction_ef is dependent on the size of max_elements,with larger number can achieve higher recall but cost more time
+    when dtype = u"float" or u"half" only half is used for store and compute
