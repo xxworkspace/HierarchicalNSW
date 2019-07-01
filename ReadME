@@ -1,0 +1,24 @@
+This project is the implementation of hnsw(https://arxiv.org/ftp/arxiv/papers/1603/1603.09320.pdf)
+  which is graph based ANNS(Approximate Nearest Neighbor Search).
+This project support int8/half/float and AVX/AVX512 instruction.
+The dimension of data should be aligned with 32.
+The dimension of data with int8 should be aligned with 64.
+
+build:
+  bash mk.sh
+
+usage:
+  import hnswxx
+
+api:
+  class hnswxx
+  methods:
+    __init__(_m=60,_dim=128,_max_elements=6000000,_query_ef=120,_construction_ef=360,
+             _space=u"l2",_dtype=u"float",_quatization=False,_max_value=0.0)
+    add_items(data,idx)
+    knn_query(data,k)
+    saveIndex(path)
+    laodIndex(path)
+
+finaly:
+  more test is needed.
