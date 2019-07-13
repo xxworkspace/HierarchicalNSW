@@ -12,6 +12,7 @@ namespace py = pybind11;
 using int8 = gemv::int8;
 using half = gemv::half;
 using LABEL = hnsw::LABEL;
+using uint8 = gemv::uint8;
 /*
  * replacement for the openmp '#pragma omp parallel for' directive
  * only handles a subset of functionality (no reductions etc)
@@ -91,6 +92,7 @@ class GraphIndex {
   hnsw::HierarchicalNSW<int8, int8, float> * INT8;
   hnsw::HierarchicalNSW<half, half, float> * HALF;
   hnsw::HierarchicalNSW<half, half, float> * FLOAT;
+  hnsw::HierarchicalNSW<uint8, uint8, float> * UINT8;
 public:
   GraphIndex(
     unsigned _m = 60,unsigned _dim = 128,unsigned _max_elements = 3600000,
@@ -101,7 +103,7 @@ public:
     query_ef(_query_ef),construction_ef(_construction_ef),
     space(_space),dtype(_dtype),
 	quatization(_quatization),max_value(_max_value),
-	normalize(false),INT8(NULL),HALF(NULL),FLOAT(NULL){
+	normalize(false),INT8(NULL),HALF(NULL),FLOAT(NULL),UINT8(NULL){
     num_threads_default = std::thread::hardware_concurrency();
     if (_space == "ip" || _space == "IP") dist = gemv::DisT::IP;
     else if (_space == "L2" || _space == "l2") dist = gemv::DisT::L2;
@@ -117,6 +119,8 @@ public:
       HALF  = new hnsw::HierarchicalNSW<half, half, float>(max_elements, M, dim, query_ef, construction_ef, dist);
     else if (dtype == "float")
       FLOAT = new hnsw::HierarchicalNSW<half, half, float>(max_elements, M, dim, query_ef, construction_ef, dist);
+    else if (dtype == "uint8")
+      UINT8 = new hnsw::HierarchicalNSW<uint8, uint8, float>(max_elements, M, dim, query_ef, construction_ef, dist);
     else
       throw std::runtime_error("data type is not supported");
   }
@@ -124,6 +128,7 @@ public:
     if(INT8) delete INT8;
 	if(HALF) delete HALF;
 	if(FLOAT)delete FLOAT;
+    if(UINT8) delete UINT8;
   }
 
   void saveIndex(const std::string &path) {
@@ -133,6 +138,8 @@ public:
       HALF->writeOut(path);
     else if (dtype == "float")
       FLOAT->writeOut(path);
+    else if (dtype == "uint8")
+      UINT8->writeOut(path);
   }
 
   void loadIndex(const std::string &path) {
@@ -142,6 +149,8 @@ public:
       HALF->readIn(path);
     else if (dtype == "float")
       FLOAT->readIn(path);
+    else if (dtype == "uint8")
+      UINT8->readIn(path);
   }
 
 #define GET_SHAPE(rows,cols,buffer)                        \
@@ -207,6 +216,18 @@ public:
         memcpy(tmp,items.data(i),sizeof(float)*cols);
         inputs.push_back(tmp);
       }
+    }else if(dtype == "uint8"){
+      py::array_t<uint8, py::array::c_style | py::array::forcecast > items(data);
+      auto buffer = items.request();
+
+      GET_SHAPE(rows,cols,buffer)
+      inputs.reserve(rows);
+      if (cols != dim) throw std::runtime_error("wrong dimensionality of the vectors");
+      for (uint32_t i = 0; i < rows; ++i){
+        void* tmp = aligned_alloc(64,sizeof(uint8)*cols);
+        memcpy(tmp,items.data(i),sizeof(uint8)*cols);
+        inputs.push_back(tmp);
+      }
     }
 
     std::vector<LABEL> ids;
@@ -258,8 +279,10 @@ public:
           INT8->insertPoint((int8*)inputs[row], ids[row]);
         else if (dtype == "half")
           HALF->insertPoint((half*)inputs[row], ids[row]);
-        else if(dtype == "float")
+        else if (dtype == "float")
           FLOAT->insertPoint((half*)inputs[row], ids[row]);
+        else if (dtype == "uint8")
+          UINT8->insertPoint((uint8*)inputs[row], ids[row]);
       }
     }
     else {
@@ -268,13 +291,15 @@ public:
           INT8->insertPoint((int8*)inputs[row], ids[row]);
         else if (dtype == "half")
           HALF->insertPoint((half*)inputs[row], ids[row]);
-        else
+        else if (dtype == "float")
           FLOAT->insertPoint((half*)inputs[row], ids[row]);
+        else if (dtype == "uint8")
+          UINT8->insertPoint((uint8*)inputs[row], ids[row]);
       });
     }
 
-    //for(auto tmp : inputs)
-    //  free(tmp);
+    for(auto tmp : inputs)
+      free(tmp);
   }
 
   py::object knnQuery_return_numpy(py::object data, size_t k = 1) {
@@ -328,6 +353,17 @@ public:
         memcpy(tmp,items.data(i),sizeof(float)*cols);
         inputs.push_back(tmp);
       }
+    }else if(dtype == "uint8"){
+      py::array_t<uint8, py::array::c_style | py::array::forcecast> items(data);
+      auto buffer = items.request();
+
+      GET_SHAPE(rows, cols, buffer)
+      if (cols != dim) throw std::runtime_error("wrong dimensionality of the vectors");
+      for (uint32_t i = 0; i < rows; ++i){
+        void* tmp = aligned_alloc(64,sizeof(uint8)*cols);
+        memcpy(tmp,items.data(i),sizeof(uint8)*cols);
+        inputs.push_back(tmp);
+      }
     }
 
     if (normalize && dtype == "half") {
@@ -365,6 +401,8 @@ public:
           result = HALF->searchKnn((half*)inputs[i], k);
         else if (dtype == "float")
           result = FLOAT->searchKnn((half*)inputs[i], k);
+        else if (dtype == "uint8")
+          result = UINT8->searchKnn((uint8*)inputs[i], k);
 
         uint32_t count = i * k + result.size();
         for(int j = count - 1 ; result.size() ; --j){
@@ -387,6 +425,8 @@ public:
           result = HALF->searchKnn((half*)inputs[row], k);
         else if (dtype == "float")
           result = FLOAT->searchKnn((half*)inputs[row], k);
+        else if (dtype == "uint8")
+          result = UINT8->searchKnn((uint8*)inputs[row], k);
 
         uint32_t count = row * k + result.size();
         for(int j = count - 1 ; result.size() ; --j){
