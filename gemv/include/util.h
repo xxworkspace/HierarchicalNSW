@@ -40,6 +40,9 @@ float _L2(float*,float*,size_t dim);
 float _IP(int8*,int8*,size_t dim);
 float _L2(int8*,int8*,size_t dim);
 
+float _IP(uint8*,uint8*,size_t dim);
+float _L2(uint8*,uint8*,size_t dim);
+
 float _IP(half*,half*,size_t dim);
 float _L2(half*,half*,size_t dim);
 

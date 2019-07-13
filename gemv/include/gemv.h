@@ -24,6 +24,8 @@ namespace gemv{
 
   typedef signed char int8;
   typedef signed short half;
+  typedef unsigned char uint8;
+
   typedef unsigned long long usize_t;  
 
   enum DisT{

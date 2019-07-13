@@ -157,6 +157,24 @@ float _L2(int8*p,int8*q,size_t dim){
   return sqrtf(float(sum));
 }
 
+float _IP(uint8*p,uint8*q,size_t dim){
+  int sum = 0;
+  for(int i = 0 ; i < dim ; i++){
+    int tmp = p[i]*q[i];
+	sum += tmp;
+  }
+  return -sum;
+}
+
+float _L2(uint8*p,uint8*q,size_t dim){
+  int sum = 0;
+  for(int i = 0 ; i < dim ; i++){
+    int tmp = p[i] - q[i];
+    sum += tmp*tmp;
+  }
+  return sqrtf(float(sum));
+}
+
 float _IP(half*p,half*q,size_t dim){
   float sum = 0;
   for(int i = 0 ;i < dim ; i++){

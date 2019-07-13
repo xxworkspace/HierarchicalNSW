@@ -38,7 +38,7 @@ void addi(ofstream& of, string i, bool disable = false) {
 
 int main() {
   std::vector<std::vector<string>> ats{
-    {"GEMV","IP", "Int8", "AVX512","25"},
+	{"GEMV","IP", "Int8", "AVX512","25"},
     {"GEMV","IP", "Half", "AVX512","25"},
     {"GEMV","IP", "Float","AVX512","25"},
     {"GEMV","IP", "Half_Float", "AVX512","25"},
@@ -49,11 +49,13 @@ int main() {
     {"GEMV","L2", "Half_Float", "AVX512","25"},
 
     {"GEMV","IP", "Int8", "AVX256","10"},
+	{"GEMV","IP", "UInt8", "AVX256","10"},
     {"GEMV","IP", "Half", "AVX256","10"},
     {"GEMV","IP", "Half_Float","AVX256","10"},
     {"GEMV","IP", "Float","AVX256","10"},
 
     {"GEMV","L2", "Int8", "AVX256","10"},
+	{"GEMV","L2", "UInt8", "AVX256","10"},
     {"GEMV","L2", "Half", "AVX256","10"},
     {"GEMV","L2", "Half_Float","AVX256","10"},
     {"GEMV","L2", "Float","AVX256","10"},
@@ -122,7 +124,7 @@ int main() {
 
         srcfile << std::endl;
 
-        if (line[2] == "Int8") {
+        if (line[2] == "Int8" || line[2] == "UInt8") {
           addi(srcfile, "mov rax,0");
           addi(srcfile, "loop%=:");
           srcfile << std::endl;
@@ -130,10 +132,13 @@ int main() {
           addi(srcfile, "mov r13,[r10]");
           addi(srcfile, "prefetchnta [r13 + rax]");
           srcfile << "      //load vector and convert" << std::endl;
-          addi(srcfile, "vmovdqu8 ymm0,[r9 + rax]");
-          addi(srcfile, "vmovdqu8 ymm1,[r9 + rax + 32]");
-          addi(srcfile, "vpmovsxbw zmm0,ymm0");
-          addi(srcfile, "vpmovsxbw zmm1,ymm1");
+          if(line[2] == "Int8"){
+            addi(srcfile, "vpmovsxbw zmm0,YMMWORD PTR [r9 + rax]");
+            addi(srcfile, "vpmovsxbw zmm1,YMMWORD PTR [r9 + rax + 32]");
+          }else{
+            addi(srcfile, "vpmovzxbw zmm0,YMMWORD PTR [r9 + rax]");
+            addi(srcfile, "vpmovzxbw zmm1,YMMWORD PTR [r9 + rax + 32]");
+          }
           srcfile << std::endl;
 
           for (int m = 0; m < n; ++m) {
@@ -147,20 +152,26 @@ int main() {
             }
             srcfile << "      //compute" << std::endl;
             if (line[1] == "IP") {
-              addi(srcfile, "vmovdqu8 ymm2,[r12 + rax]");
-              addi(srcfile, "vmovdqu8 ymm3,[r12 + rax + 32]");
-              addi(srcfile, "vpmovsxbw zmm2,ymm2");
-              addi(srcfile, "vpmovsxbw zmm3,ymm3");
+              if(line[2] == "Int8"){
+                addi(srcfile, "vpmovsxbw zmm2,YMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovsxbw zmm3,YMMWORD PTR [r12 + rax + 32]");
+              }else{
+                addi(srcfile, "vpmovzxbw zmm2,YMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovzxbw zmm3,YMMWORD PTR [r12 + rax + 32]");
+              }
               addi(srcfile, "vpmaddwd zmm4,zmm2,zmm0");
               addi(srcfile, "vpmaddwd zmm5,zmm3,zmm1");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",zmm4");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",zmm5");
             }
             else {
-              addi(srcfile, "vmovdqu8 ymm2,[r12 + rax]");
-              addi(srcfile, "vmovdqu8 ymm3,[r12 + rax + 32]");
-              addi(srcfile, "vpmovsxbw zmm2,ymm2");
-              addi(srcfile, "vpmovsxbw zmm3,ymm3");
+              if(line[2] == "Int8"){
+                addi(srcfile, "vpmovsxbw zmm2,YMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovsxbw zmm3,YMMWORD PTR [r12 + rax + 32]");
+              }else{
+                addi(srcfile, "vpmovzxbw zmm2,YMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovzxbw zmm3,YMMWORD PTR [r12 + rax + 32]");
+              }
               addi(srcfile, "vpsubw zmm4,zmm2,zmm0");
               addi(srcfile, "vpsubw zmm5,zmm3,zmm1");
               addi(srcfile, "vpmaddwd zmm4,zmm4,zmm4");
@@ -456,7 +467,7 @@ int main() {
           addi(srcfile, "vxorps " + r_file[k] + "," + r_file[k] + "," + r_file[k]);
         }
         srcfile << std::endl;
-        if (line[2] == "Int8") {
+        if (line[2] == "Int8" || line[2] == "UInt8") {
           addi(srcfile, "mov rax,0");
           addi(srcfile, "loop%=:");
           srcfile << "      //prefetch the first line" << std::endl;
@@ -464,14 +475,17 @@ int main() {
           addi(srcfile, "prefetchnta [r13 + rax]");
 
           srcfile << "      //load and convert" << std::endl;
-          addi(srcfile, "lddqu xmm2, [r9 + rax]");
-          addi(srcfile, "lddqu xmm3, [r9 + rax + 16]");
-          addi(srcfile, "lddqu xmm4, [r9 + rax + 32]");
-          addi(srcfile, "lddqu xmm5, [r9 + rax + 48]");
-          addi(srcfile, "vpmovsxbw ymm2,xmm2");
-          addi(srcfile, "vpmovsxbw ymm3,xmm3");
-          addi(srcfile, "vpmovsxbw ymm4,xmm4");
-          addi(srcfile, "vpmovsxbw ymm5,xmm5");
+          if(line[2] == "Int8"){
+            addi(srcfile, "vpmovsxbw ymm2,XMMWORD PTR [r9 + rax]");
+            addi(srcfile, "vpmovsxbw ymm3,XMMWORD PTR [r9 + rax + 16]");
+            addi(srcfile, "vpmovsxbw ymm4,XMMWORD PTR [r9 + rax + 32]");
+            addi(srcfile, "vpmovsxbw ymm5,XMMWORD PTR [r9 + rax + 48]");
+          }else{
+            addi(srcfile, "vpmovzxbw ymm2,XMMWORD PTR [r9 + rax]");
+            addi(srcfile, "vpmovzxbw ymm3,XMMWORD PTR [r9 + rax + 16]");
+            addi(srcfile, "vpmovzxbw ymm4,XMMWORD PTR [r9 + rax + 32]");
+            addi(srcfile, "vpmovzxbw ymm5,XMMWORD PTR [r9 + rax + 48]");
+          }
           srcfile << std::endl;
 
           for (int m = 0; m < n; ++m) {
@@ -485,38 +499,50 @@ int main() {
 
             srcfile << "      //compute" << std::endl;
             if (line[1] == "IP") {
-              addi(srcfile, "lddqu xmm0, [r12 + rax]");
-              addi(srcfile, "lddqu xmm1, [r12 + rax + 16]");
-              addi(srcfile, "vpmovsxbw ymm0,xmm0");
-              addi(srcfile, "vpmovsxbw ymm1,xmm1");
+              if(line[2] == "Int8"){
+                addi(srcfile, "vpmovsxbw ymm0,XMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovsxbw ymm1,XMMWORD PTR [r12 + rax + 16]");
+              }else{
+                addi(srcfile, "vpmovzxbw ymm0,XMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovzxbw ymm1,XMMWORD PTR [r12 + rax + 16]");
+              }
               addi(srcfile, "vpmaddwd ymm0,ymm2,ymm0");
               addi(srcfile, "vpmaddwd ymm1,ymm3,ymm1");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",ymm0");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",ymm1");
-              addi(srcfile, "lddqu xmm0, [r12 + rax + 32]");
-              addi(srcfile, "lddqu xmm1, [r12 + rax + 48]");
-              addi(srcfile, "vpmovsxbw ymm0,xmm0");
-              addi(srcfile, "vpmovsxbw ymm1,xmm1");
+              if(line[2] == "Int8"){
+                addi(srcfile, "vpmovsxbw ymm0,XMMWORD PTR [r12 + rax + 32]");
+                addi(srcfile, "vpmovsxbw ymm1,XMMWORD PTR [r12 + rax + 48]");
+              }else{
+                addi(srcfile, "vpmovzxbw ymm0,XMMWORD PTR [r12 + rax + 32]");
+                addi(srcfile, "vpmovzxbw ymm1,XMMWORD PTR [r12 + rax + 48]");
+              }
               addi(srcfile, "vpmaddwd ymm0,ymm4,ymm0");
               addi(srcfile, "vpmaddwd ymm1,ymm5,ymm1");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",ymm0");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",ymm1");
             }
             else {
-              addi(srcfile, "lddqu xmm0, [r12 + rax]");
-              addi(srcfile, "lddqu xmm1, [r12 + rax + 16]");
-              addi(srcfile, "vpmovsxbw ymm0,xmm0");
-              addi(srcfile, "vpmovsxbw ymm1,xmm1");
+              if(line[2] == "Int8"){
+                addi(srcfile, "vpmovsxbw ymm0,XMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovsxbw ymm1,XMMWORD PTR [r12 + rax + 16]");
+              }else{
+                addi(srcfile, "vpmovzxbw ymm0,XMMWORD PTR [r12 + rax]");
+                addi(srcfile, "vpmovzxbw ymm1,XMMWORD PTR [r12 + rax + 16]");
+              }
               addi(srcfile, "vpsubw ymm0,ymm2,ymm0");
               addi(srcfile, "vpsubw ymm1,ymm3,ymm1");
               addi(srcfile, "vpmaddwd ymm0,ymm0,ymm0");
               addi(srcfile, "vpmaddwd ymm1,ymm1,ymm1");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",ymm0");
               addi(srcfile, "vpaddd " + r_file[m] + "," + r_file[m] + ",ymm1");
-              addi(srcfile, "lddqu xmm0, [r12 + rax + 32]");
-              addi(srcfile, "lddqu xmm1, [r12 + rax + 48]");
-              addi(srcfile, "vpmovsxbw ymm0,xmm0");
-              addi(srcfile, "vpmovsxbw ymm1,xmm1");
+              if(line[2] == "Int8"){
+                addi(srcfile, "vpmovsxbw ymm0,XMMWORD PTR [r12 + rax + 32]");
+                addi(srcfile, "vpmovsxbw ymm1,XMMWORD PTR [r12 + rax + 48]");
+              }else{
+                addi(srcfile, "vpmovzxbw ymm0,XMMWORD PTR [r12 + rax + 32]");
+                addi(srcfile, "vpmovzxbw ymm1,XMMWORD PTR [r12 + rax + 48]");
+              }
               addi(srcfile, "vpsubw ymm0,ymm4,ymm0");
               addi(srcfile, "vpsubw ymm1,ymm5,ymm1");
               addi(srcfile, "vpmaddwd ymm0,ymm0,ymm0");
@@ -798,7 +824,8 @@ int main() {
     }
 	hinfo += "    }},\n";
   }
-  hinfo += "  };\npublic:\n  const std::vector<GEMV>& operator[](std::string name){\n    return GemvPtr[name];\n  }\n};\n";
+  hinfo += "  };\npublic:\n  const std::vector<GEMV>& operator[](std::string name){\n    return GemvPtr[name];\n  }\n";
+  hinfo += "\n  bool hasKernel(std::string name){\n    return GemvPtr.count(name);\n  }\n};\n";
   hfile << std::endl << hinfo;
   hfile << std::endl << "}" << std::endl;
   srcfile << std::endl << "}" << std::endl;

@@ -25,6 +25,8 @@ std::vector<GEMV> GetGemvAVX(Params<T1,T2,T3>&p){
 
   if(std::is_same<T1,int8>::value)
     ptrName += "Int8_";
+  else if(std::is_same<T1,uint8>::value)
+    ptrName += "UInt8_";
   else if(std::is_same<T1,half>::value && std::is_same<T2,half>::value)
     ptrName += "Half_";
   else if(std::is_same<T1,half>::value && std::is_same<T2,float>::value)
@@ -43,7 +45,11 @@ std::vector<GEMV> GetGemvAVX(Params<T1,T2,T3>&p){
   else if(hasAVX() && !std::is_same<T1, int8>::value)
     ptrName += "AVX256";
   else{
-    printf("this device is not supported");
+    printf("this device is not supported\n");
+    exit(0);
+  }
+  if(!GInfo.hasKernel(ptrName)){
+    printf("this type %s is not supported\n",ptrName.c_str());
     exit(0);
   }
   return GInfo[ptrName];
@@ -72,7 +78,7 @@ inline void GemvAVX(Params<T1,T2,T3>&p){//const std::vector<GEMV>& gemvPtr){
     if(remain >= (size << 1))
       tmp = size;
     if(remain >= size)
-      tmp = size/2;
+      tmp = (size + 1)/2;
     else
       tmp = remain;
 
@@ -83,6 +89,7 @@ inline void GemvAVX(Params<T1,T2,T3>&p){//const std::vector<GEMV>& gemvPtr){
 }
 
 template void GemvAVX<int8,int8,float>(Params<int8,int8,float>&);
+template void GemvAVX<uint8,uint8,float>(Params<uint8,uint8,float>&);
 template void GemvAVX<half,half,float>(Params<half,half,float>&);
 template void GemvAVX<half,float,float>(Params<half,float,float>&);
 template void GemvAVX<float,float,float>(Params<float,float,float>&);
